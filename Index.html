@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holi | AMRIT OM Ultimate</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  overflow:hidden;
+  background:radial-gradient(circle at bottom,#12002a,#000);
+}
+canvas{display:block;}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<audio id="boomSound">
+  <source src="https://assets.mixkit.co/sfx/preview/mixkit-deep-explosion-with-reverb-275.wav" type="audio/wav">
+</audio>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const sound = document.getElementById("boomSound");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener("resize",()=>{
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  initText();
+});
+
+let particles=[];
+let textPoints=[];
+let phase="explode";
+let pulseRadius=0;
+
+/* Shockwave */
+let shockwave={active:false,radius:0,maxRadius:0};
+
+/* Particle */
+
+class Particle{
+  constructor(x,y){
+    this.x=x;
+    this.y=y;
+    this.vx=(Math.random()-0.5)*10;
+    this.vy=(Math.random()-0.5)*10;
+    this.targetX=x;
+    this.targetY=y;
+    this.size=2+Math.random()*2;
+    this.baseHue=Math.random()*360;
+  }
+
+  update(){
+    if(phase==="explode"){
+      this.x+=this.vx;
+      this.y+=this.vy;
+      this.vx*=0.98;
+      this.vy*=0.98;
+    }
+
+    if(phase==="reform"){
+      const dx=this.targetX-this.x;
+      const dy=this.targetY-this.y;
+      this.x+=dx*0.08;
+      this.y+=dy*0.08;
+    }
+
+    this.draw();
+  }
+
+  draw(){
+    const distFromCenter = Math.hypot(
+      this.x - canvas.width/2,
+      this.y - canvas.height/2
+    );
+
+    let hue = this.baseHue;
+
+    /* Color Pulse Wave */
+    if(Math.abs(distFromCenter - pulseRadius) < 40){
+      hue = (this.baseHue + 180) % 360;
+      ctx.shadowBlur = 25;
+    }else{
+      ctx.shadowBlur = 8;
+    }
+
+    ctx.shadowColor = "hsl("+hue+",100%,60%)";
+    ctx.fillStyle="hsl("+hue+",100%,60%)";
+
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+/* Text Mapping */
+
+function initText(){
+  textPoints=[];
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const text="AMRIT OM";
+  const fontSize=Math.min(canvas.width/8,130);
+
+  ctx.fillStyle="white";
+  ctx.textAlign="center";
+  ctx.font="bold "+fontSize+"px Arial";
+  ctx.fillText(text,canvas.width/2,canvas.height/2);
+
+  const data=ctx.getImageData(0,0,canvas.width,canvas.height);
+
+  for(let y=0;y<canvas.height;y+=6){
+    for(let x=0;x<canvas.width;x+=6){
+      const i=(y*canvas.width+x)*4;
+      if(data.data[i+3]>128){
+        textPoints.push({x,y});
+      }
+    }
+  }
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  particles=[];
+  textPoints.forEach(()=>{
+    particles.push(new Particle(canvas.width/2,canvas.height/2));
+  });
+
+  assignTargets();
+}
+
+function assignTargets(){
+  particles.forEach((p,i)=>{
+    if(textPoints[i]){
+      p.targetX=textPoints[i].x;
+      p.targetY=textPoints[i].y;
+    }
+  });
+}
+
+/* Shockwave Drawing */
+
+function drawShockwave(){
+  if(!shockwave.active)return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(canvas.width/2,canvas.height/2,shockwave.radius,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,255,255,"+(1-shockwave.radius/shockwave.maxRadius)+")";
+  ctx.lineWidth=5;
+  ctx.shadowColor="#ffffff";
+  ctx.shadowBlur=40;
+  ctx.stroke();
+  ctx.restore();
+
+  shockwave.radius+=20;
+  pulseRadius=shockwave.radius;
+
+  if(shockwave.radius>shockwave.maxRadius){
+    shockwave.active=false;
+  }
+}
+
+/* Animation */
+
+function animate(){
+  requestAnimationFrame(animate);
+  ctx.fillStyle="rgba(0,0,0,0.25)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  particles.forEach(p=>p.update());
+  drawShockwave();
+}
+
+animate();
+initText();
+
+/* Phase Control */
+
+function triggerExplosion(){
+  phase="explode";
+
+  particles.forEach(p=>{
+    p.vx=(Math.random()-0.5)*14;
+    p.vy=(Math.random()-0.5)*14;
+  });
+
+  shockwave.active=true;
+  shockwave.radius=0;
+  shockwave.maxRadius=Math.max(canvas.width,canvas.height);
+  pulseRadius=0;
+
+  /* Play synchronized sound */
+  sound.currentTime=0;
+  sound.play();
+
+  setTimeout(()=>{
+    phase="reform";
+  },2000);
+}
+
+setTimeout(triggerExplosion,1000);
+setInterval(triggerExplosion,8000);
+
+</script>
+
+</body>
+</html>
